@@ -1,0 +1,22 @@
+{
+    "Welcome": "Welcome",
+    "Install the app to use it.": "Install the app to use it.",
+    "Read more": "Read more",
+    "Payments": "Payments",
+    "Last payments (Maximal 100)": "Last payments (Maximal 100)",
+    "Back": "Back",
+    "No Payments have been found": "No Payments have been found",
+    "Stripe connected": "Stripe connected",
+    "Logs": "Logs",
+    "Disconnect Stripe": "Disconnect Stripe",
+    "The app is installed.": "The app is installed.",
+    "Connect or Create your Stripe Account": "Connect or Create your Stripe Account",
+    "Last logs (Maximal 100)": "Last logs (Maximal 100)",
+    "No logs have been found": "No logs have been found",
+    "Payment": "Payment",
+    "Processing your payment": "Processing your payment",
+    "This can take a minute...": "This can take a minute...",
+    "Payment failed": "Payment failed",
+    "Try again": "Try again",
+    "Cancel": "Cancel"
+}
