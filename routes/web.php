@@ -64,36 +64,6 @@ Route::middleware(['care.app'])->group(function () {
 
     })  ; 
 
-    Route::get('/payment/{uuid}', function (Request $request, $uuid) {
-
-        $stripePayment = StripePayment::where('uuid', $uuid)->first() ;
-        $stripePaymentData = json_decode($stripePayment->data) ;
-
-        $reservationId = false ; 
-
-        if(isset($stripePaymentData->metadata->reservation_id)){
-            $reservationId = $stripePaymentData->metadata->reservation_id ;
-        }
-
-        $api = new CareApi() ;
-        $api->setTokens($stripePayment->admin_id) ;
-
-        $guestPageUrl = $api->getGuestPageUrl($reservationId) ;
-
-        if($stripePayment->status == 'done'){
-            return redirect($guestPageUrl."?payment=success") ;
-        } ;
-
-        $tryAgainUrl = StripeApp::getTryAgainUrl($stripePayment) ;
-
-        view()->share('tryAgainUrl', $tryAgainUrl) ;
-        view()->share('guestPageUrl', $guestPageUrl) ;
-        view()->share('payment', $stripePayment) ;
-
-        return view('/payment') ;
-
-    })  ; 
-
     Route::get('/logs', function (Request $request) {
         
         $logs = 'no logs' ; 
@@ -139,3 +109,37 @@ Route::middleware(['care.app'])->group(function () {
     
 
 }) ;
+
+Route::get('/payment/{uuid}', function (Request $request, $uuid) {
+
+    $stripePayment = StripePayment::where('uuid', $uuid)->first() ;
+    $stripePaymentData = json_decode($stripePayment->data) ;
+
+    $reservationId = false ; 
+
+    if(isset($stripePaymentData->metadata->reservation_id)){
+        $reservationId = $stripePaymentData->metadata->reservation_id ;
+    }
+
+    $api = new CareApi() ;
+    $api->setTokens($stripePayment->admin_id) ;
+
+    $guestPageUrl = $api->getGuestPageUrl($reservationId) ;
+
+    if($stripePayment->status == 'done'){
+        return redirect($guestPageUrl."?payment=success") ;
+    } ;
+
+    if($request->input('action') == 'canceled'){
+        return redirect($guestPageUrl."?payment=canceled") ;
+    } ;
+
+    $tryAgainUrl = StripeApp::getTryAgainUrl($stripePayment) ;
+
+    view()->share('tryAgainUrl', $tryAgainUrl) ;
+    view()->share('guestPageUrl', $guestPageUrl) ;
+    view()->share('payment', $stripePayment) ;
+
+    return view('/payment') ;
+
+})  ; 

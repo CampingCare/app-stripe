@@ -36,7 +36,7 @@ Route::get('/webhooks/payment-request', function (Request $request) {
     $stripePayment->uuid = $uuid ;
     $stripePayment->admin_id = $admin_id ;
     $stripePayment->status = 'pending' ;
-    $stripePayment->amount = $amount ;
+    $stripePayment->amount = $request->input('amount') ;
 
     $stripePayment->save() ;
 
@@ -147,6 +147,11 @@ Route::post('/webhooks/payment', function (Request $request) {
     $charge = $event->data->object;
 
     $stripePayment = StripePayment::where('provider_id', $charge->payment_intent)->first() ;
+
+    if(!isset($stripePayment->data)){
+        return response()->json('ok') ; // this is not a valid payment webhook
+    };
+
     $stripePaymentData = json_decode($stripePayment->data) ;
 
     if(isset($stripePaymentData->metadata->invoice_id)){
