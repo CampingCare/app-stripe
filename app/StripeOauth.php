@@ -11,22 +11,22 @@ use App\CareApi;
 class StripeOauth
 {
 
-    static public function getProvider(){
+    static public function getStripe(){
 
         // Set your secret key. Remember to switch to your live secret key in production.
         // See your keys here: https://dashboard.stripe.com/apikeys
-        \Stripe\Stripe::setApiKey(getenv('STRIPE_API_KEY'));
+        return new \Stripe\StripeClient(getenv('STRIPE_API_KEY'));
 
     }
 
     static public function setAccessToken($code){
         
-        $provider = self::getProvider();
+        $stripe = self::getStripe();
 
-        $response = \Stripe\OAuth::token([
+        $response = $stripe->oauth->token([
             'grant_type' => 'authorization_code',
             'code' => $code,
-        ]);
+        ]) ;
 
         $StripeTokens = StripeTokens::find(Session::get('adminId'));
 

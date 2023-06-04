@@ -22,8 +22,11 @@
                 <p class="py-4">{{ __('Stripe has been installed and you are now able to receive payments.') }}</p>
 
                 <div class="py-4 mt-4">
+                    
                     <a href="/logs" class="bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded">{{ __('Logs') }}</a>
                     <a href="/payments" class="bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded">{{ __('Payments') }}</a>
+                    <a href="/terminals" class="bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded">{{ __('Terminals') }}</a>
+
                 </div>
 
                 <p class="py-2 mt-4">

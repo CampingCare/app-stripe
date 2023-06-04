@@ -9,6 +9,7 @@ use App\Models\Logs;
 use App\StripeOauth;
 use App\StripeApp;
 use App\CareApi;
+use App\StripeTerminals;
 
 /*
 |--------------------------------------------------------------------------
@@ -103,6 +104,34 @@ Route::middleware(['care.app'])->group(function () {
         view()->share('payments', $payments) ;
 
         return view('/payments') ;
+
+    })  ; 
+
+    Route::get('/terminals', function (Request $request) {
+        
+        if(Session::has('adminId')){
+
+            $api = new CareApi() ;
+            $devices = $api->get('/devices')->json() ;    
+        
+            if($request->input('action') == 'delete'){
+                StripeTerminals::removeDevice($request->input('device_id')) ;
+                $devices = $api->get('/devices')->json() ;    
+            }
+            
+            if($request->input('action') == 'sync'){
+                StripeTerminals::sync($devices) ;
+                $devices = $api->get('/devices')->json() ;    
+            }
+
+            $terminals = StripeTerminals::list($devices) ;
+
+            view()->share('terminals', $terminals) ;
+            view()->share('devices', $devices) ;
+
+            return view('/terminals') ;
+
+        }
 
     })  ; 
 

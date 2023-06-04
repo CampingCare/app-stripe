@@ -65,35 +65,91 @@ Route::get('/webhooks/payment-request', function (Request $request) {
         $metadata['invoice_id'] = $request->input('invoice_id') ;
     }  
 
-    $request = 
-    [
-        'line_items' => [[
-            'price_data' => [
-                'currency' => strtolower($currency),
-                'product_data' => [
-                    'name' => $description
-                ],
-                'unit_amount' => $amount,
-            ],
-            'quantity' => 1,
-        ]],
-        'mode' => 'payment',
-        'success_url' => getenv('APP_URL')."/payment/".$uuid,
-        'cancel_url' => getenv('APP_URL')."/payment/".$uuid."?action=canceled",
-        'automatic_tax' => [
-            'enabled' => false,
-        ],
-        'metadata' => $metadata,
-    ] ;
+    $stripe = StripeOauth::getStripe();
 
-    StripeOauth::getProvider();
-    $checkout_session = \Stripe\Checkout\Session::create($request, ["stripe_account" => $stripeTokens->stripe_user_id]) ;
-    
-    $stripePayment->provider_id = $checkout_session->payment_intent ;
-    $stripePayment->data = json_encode($request) ;
-    $stripePayment->save() ;
-    
-    return redirect($checkout_session->url) ;
+    if($request->input('device_id')){
+        
+        $metadata['device_id'] = $request->input('device_id') ;
+
+        $api = new CareApi() ;
+        $api->setTokens($metadata['admin_id']) ;
+
+        $response = $api->get('/devices/'.$metadata['device_id']) ;
+
+        $device = $response->json() ;
+
+        if(!isset($device['meta']['stripe_terminal_id'])){
+            dd('Could not find the Stripe Terminal ID');
+        }
+
+        $requestData = [
+            'currency' => strtolower($currency),
+            'payment_method_types' => ['card_present'],
+            'capture_method' => 'automatic',
+            'amount' => $amount,
+            'metadata' => $metadata,
+        ] ;
+
+        if($request->input('application_fee')){
+            $requestData['application_fee_amount'] = number_format($request->input('application_fee'), 2, '', '') ;
+        }
+
+        $paymentIntent = $stripe->paymentIntents->create($requestData, ["stripe_account" => $stripeTokens->stripe_user_id]) ;
+
+        $stripe->terminal->readers->processPaymentIntent(
+            $device['meta']['stripe_terminal_id'],
+            ['payment_intent' => $paymentIntent->id],
+            ["stripe_account" => $stripeTokens->stripe_user_id]
+        );
+
+        $stripePayment->provider_id = $paymentIntent->id ;
+        $stripePayment->data = json_encode($request) ;
+        $stripePayment->save() ;
+        
+        return response()->json('ok') ;
+
+    } else {
+
+        $metadata['invoice_id'] = $request->input('invoice_id') ;
+
+        $requestData = 
+        [
+            'line_items' => [[
+                'price_data' => [
+                    'currency' => strtolower($currency),
+                    'product_data' => [
+                        'name' => $description
+                    ],
+                    'unit_amount' => $amount,
+                ],
+                'quantity' => 1,
+            ]],
+            'mode' => 'payment',
+            'success_url' => getenv('APP_URL')."/payment/".$uuid,
+            'cancel_url' => getenv('APP_URL')."/payment/".$uuid."?action=canceled",
+            'automatic_tax' => [
+                'enabled' => false,
+            ],
+            'metadata' => $metadata,
+        ] ;
+
+        if($request->input('application_fee')){
+
+            $requestData['payment_intent_data'] = [
+                "application_fee_amount" => number_format($request->input('application_fee'), 2, '', '')
+            ] ;
+
+        }
+
+        $checkout_session = $stripe->checkout->sessions->create($requestData, ["stripe_account" => $stripeTokens->stripe_user_id]) ;
+        
+        $stripePayment->provider_id = $checkout_session->payment_intent ;
+        $stripePayment->data = json_encode($request) ;
+        $stripePayment->save() ;
+        
+        return redirect($checkout_session->url) ;
+
+    }
 
 }) ; 
 
