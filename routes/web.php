@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 
@@ -10,6 +11,7 @@ use App\StripeOauth;
 use App\StripeApp;
 use App\CareApi;
 use App\StripeTerminals;
+use App\Helpers;
 
 /*
 |--------------------------------------------------------------------------
@@ -25,72 +27,59 @@ use App\StripeTerminals;
 Route::middleware(['care.app'])->group(function () {
 
     Route::get('/', function (Request $request) {
+        if (!Session::get('installed'))
+            return view('welcome');
 
-        if(Session::get('installed')){
+        Helpers::log($request->all());
 
-            // $api = new CareApi() ;
+        if ($request->input('action') == 'disconnect')
+            StripeOauth::removeAccessToken();
 
-            // $result = $api->get('/users/me', ['get_rights' => true]) ;
+        $stripeTokens = StripeOauth::getTokens();
+        if ($stripeTokens)
+            view()->share('stripeTokens', $stripeTokens);
 
-            // view()->share('user', $result->object()) ;
+        return view('installed', [
+            'clientId' => getenv('STRIPE_CLIENT_ID'),
+            'state' => json_encode([
+                'platformUrl' => Session::get('platformUrl'),
+                'admin_id' => Session::get('adminId'),
+                'app_id' => Session::get('appId')
+            ])
+        ]);
+    });
 
-            if($request->input('action') == 'disconnect'){
+    Route::get('/connect', function (Request $request) {
+        if (!$request->has('state'))
+            return redirect('https://app.camping.care');
 
-                StripeOauth::removeAccessToken() ;
+        $state = json_decode($request->input('state'), true);
 
-            };
+        if ($request->input('code'))
+            StripeOauth::setAccessToken($request->input('code'), $state['admin_id']);
 
-            if($request->input('code')){
-
-                StripeOauth::setAccessToken($request->input('code')) ;
-                return redirect(Session::get('platformUrl').'/apps/'.Session::get('appId')) ;
-
-            }else{
-                
-                $stripeTokens = StripeOauth::getTokens() ;
-
-                if($stripeTokens){
-                    view()->share('stripeTokens', $stripeTokens) ;
-                }
-
-            }
-
-            view()->share('clientId', getenv('STRIPE_CLIENT_ID')) ;
-
-            return view('installed') ;
-
-        }
-        
-        return view('welcome') ;
-
-    })  ; 
+        return redirect("{$state['platformUrl']}/apps/{$state['app_id']}");
+    });
 
     Route::get('/logs', function (Request $request) {
-        
-        $logs = 'no logs' ; 
+        $logs = 'no logs';
 
-        if(Session::has('adminId')){
-
-            if($request->input('action') == 'clear'){
+        if (Session::has('adminId')) {
+            if ($request->input('action') == 'clear')
                 Logs::where('admin_id', Session::get('adminId'))->delete();
-            }
 
             $logs = Logs::where('admin_id', Session::get('adminId'))
-               ->orderBy('id', 'desc')
-               ->take(10)
-               ->get();
-
+                ->orderBy('id', 'desc')
+                ->take(10)
+                ->get();
         }
 
-        view()->share('logs', $logs) ;
-
-        return view('/logs') ;
-
-    })  ; 
+        return view('/logs', ['logs' => $logs]);
+    });
 
     Route::get('/payments', function (Request $request) {
-        
-        $payments = 'no payments' ; 
+
+        $payments = 'no payments' ;
 
         if(Session::has('adminId')){
 
@@ -105,46 +94,40 @@ Route::middleware(['care.app'])->group(function () {
 
         return view('/payments') ;
 
-    })  ; 
+    })  ;
 
     Route::get('/terminals', function (Request $request) {
-        
-        if(Session::has('adminId')){
+        if (!Session::has('adminId'))
+            return redirect('/');
 
-            $api = new CareApi() ;
-            $devices = $api->get('/devices')->json() ;    
-        
-            if($request->input('action') == 'delete'){
-                StripeTerminals::removeDevice($request->input('device_id')) ;
-                $devices = $api->get('/devices')->json() ;    
-            }
-            
-            if($request->input('action') == 'sync'){
-                StripeTerminals::sync($devices) ;
-                $devices = $api->get('/devices')->json() ;    
-            }
+        $api = new CareApi();
+        $devices = $api->get('/devices')->json();
 
-            $terminals = StripeTerminals::list($devices) ;
-
-            view()->share('terminals', $terminals) ;
-            view()->share('devices', $devices) ;
-
-            return view('/terminals') ;
-
+        if ($request->input('action') == 'delete') {
+            StripeTerminals::removeDevice($request->input('device_id'));
+            $devices = $api->get('/devices')->json();
         }
 
-    })  ; 
+        if ($request->input('action') == 'sync') {
+            StripeTerminals::sync($devices);
+            $devices = $api->get('/devices')->json();
+        }
 
-    
+        $terminals = StripeTerminals::list($devices);
 
-}) ;
+        view()->share('terminals', $terminals);
+        view()->share('devices', $devices);
+
+        return view('/terminals');
+    });
+});
 
 Route::get('/payment/{uuid}', function (Request $request, $uuid) {
 
     $stripePayment = StripePayment::where('uuid', $uuid)->first() ;
     $stripePaymentData = json_decode($stripePayment->data) ;
 
-    $reservationId = false ; 
+    $reservationId = false ;
 
     if(isset($stripePaymentData->metadata->reservation_id)){
         $reservationId = $stripePaymentData->metadata->reservation_id ;
@@ -171,4 +154,4 @@ Route::get('/payment/{uuid}', function (Request $request, $uuid) {
 
     return view('/payment') ;
 
-})  ; 
+})  ;
