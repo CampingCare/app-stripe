@@ -10,8 +10,8 @@ use App\Models\Logs;
 use App\StripeOauth;
 use App\StripeApp;
 use App\CareApi;
-use App\StripeTerminals;
 use App\Helpers;
+use App\StripeTerminals;
 
 /*
 |--------------------------------------------------------------------------
@@ -29,8 +29,6 @@ Route::middleware(['care.app'])->group(function () {
     Route::get('/', function (Request $request) {
         if (!Session::get('installed'))
             return view('welcome');
-
-        Helpers::log($request->all());
 
         if ($request->input('action') == 'disconnect')
             StripeOauth::removeAccessToken();
@@ -96,29 +94,62 @@ Route::middleware(['care.app'])->group(function () {
 
     })  ;
 
-    Route::get('/terminals', function (Request $request) {
+    ///////////////
+    // Terminals //
+    ///////////////
+
+    Route::get('/terminals', function () {
         if (!Session::has('adminId'))
             return redirect('/');
 
         $api = new CareApi();
         $devices = $api->get('/devices')->json();
 
-        if ($request->input('action') == 'delete') {
-            StripeTerminals::removeDevice($request->input('device_id'));
-            $devices = $api->get('/devices')->json();
+        $terminals = StripeTerminals::list($devices);
+
+        return view('/terminals', [
+            'terminals' => $terminals,
+            'devices' => $devices
+        ]);
+    });
+
+    Route::post('/terminals/connect/{deviceId}', function (string $deviceId) {
+        try {
+            $device = StripeTerminals::getDevice($deviceId);
+
+            StripeTerminals::addDevice($device);
+        }
+        catch (Exception $e) {
+            return redirect()->back()->withErrors([$e->getMessage()]);
         }
 
-        if ($request->input('action') == 'sync') {
+        return redirect()->back();
+    });
+
+    Route::post('/terminals/disconnect/{careDeviceId}', function (string $careDeviceId) {
+        try {
+            StripeTerminals::removeDevice($careDeviceId);
+        }
+        catch (Exception $e) {
+            return redirect()->back()->withErrors([$e->getMessage()]);
+        }
+
+        return redirect()->back();
+    });
+
+    Route::post('/terminals/sync', function () {
+        $api = new CareApi();
+        $devices = $api->get('/devices')->json();
+
+        try {
             StripeTerminals::sync($devices);
             $devices = $api->get('/devices')->json();
         }
+        catch (Exception $e) {
+            return redirect()->back()->withErrors([$e->getMessage()]);
+        }
 
-        $terminals = StripeTerminals::list($devices);
-
-        view()->share('terminals', $terminals);
-        view()->share('devices', $devices);
-
-        return view('/terminals');
+        return redirect()->back();
     });
 });
 
