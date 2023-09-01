@@ -32,9 +32,17 @@
                 <a href="?action=disconnect"
                     class="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded">{{ __('Disconnect Stripe') }}</a>
             </p>
+
+            <p class="p-4 pl-0 pr-0">
+                <a
+                    href="https://support.camping.care/en/how-to-set-up-the-stripe-app" target="_blank"
+                    class="bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
+                >
+                    {{ __('Read more') }}
+                </a>
+            </p>
         @else
             <div class="text-center py-8 mt-8">
-
                 <h1 class="text-3xl font-bold">
                     {{ __('The app is installed.') }}
                 </h1>
@@ -43,26 +51,21 @@
                     {{ __('By connecting your Stripe account you can receive direct payments in to your bankaccount. Clients can pay via Creditcard, IDeal, Sofort, Mistercash or Paypal.') }}
                 </p>
 
-                <p class="py-4">
-                    <a
-                        href="https://connect.stripe.com/oauth/authorize?response_type=code&client_id={{ $clientId }}&scope=read_write&state={{ $state }}"
-                        class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-                        target="_parent"
-                    >
-                        {{ __('Connect or Create your Stripe Account') }}
-                    </a>
-                </p>
+                <a
+                    href="https://connect.stripe.com/oauth/authorize?response_type=code&client_id={{ $clientId }}&scope=read_write&state={{ $state }}"
+                    class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
+                    target="_parent"
+                >
+                    {{ __('Connect or Create your Stripe Account') }}
+                </a>
 
+                <a
+                    href="https://support.camping.care/en/how-to-set-up-the-stripe-app" target="_blank"
+                    class="block mt-4 underline"
+                >
+                    {{ __('Read more') }}
+                </a>
             </div>
         @endisset
-
-        <p class="p-4 pl-0 pr-0">
-            <a
-                href="https://support.camping.care/en/how-to-set-up-the-stripe-app" target="_blank"
-                class="bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded"
-            >
-                {{ __('Read more') }}
-            </a>
-        </p>
     </div>
 </x-layout>
