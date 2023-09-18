@@ -75,24 +75,17 @@ Route::middleware(['care.app'])->group(function () {
         return view('/logs', ['logs' => $logs]);
     });
 
-    Route::get('/payments', function (Request $request) {
+    Route::get('/payments', function () {
+        $payments = [];
 
-        $payments = 'no payments' ;
-
-        if(Session::has('adminId')){
-
+        if (Session::has('adminId'))
             $payments = StripePayment::where('admin_id', Session::get('adminId'))
                ->orderBy('id', 'desc')
                ->take(100)
                ->get();
 
-        }
-
-        view()->share('payments', $payments) ;
-
-        return view('/payments') ;
-
-    })  ;
+        return view('/payments', ['payments' => $payments]);
+    });
 
     ///////////////
     // Terminals //
@@ -154,35 +147,29 @@ Route::middleware(['care.app'])->group(function () {
 });
 
 Route::get('/payment/{uuid}', function (Request $request, $uuid) {
+    $stripePayment = StripePayment::where('uuid', $uuid)->first();
+    $stripePaymentData = json_decode($stripePayment->data);
 
-    $stripePayment = StripePayment::where('uuid', $uuid)->first() ;
-    $stripePaymentData = json_decode($stripePayment->data) ;
+    $reservationId = false;
+    if (isset($stripePaymentData->metadata->reservation_id))
+        $reservationId = $stripePaymentData->metadata->reservation_id;
 
-    $reservationId = false ;
+    $api = new CareApi();
+    $api->setTokens($stripePayment->admin_id);
 
-    if(isset($stripePaymentData->metadata->reservation_id)){
-        $reservationId = $stripePaymentData->metadata->reservation_id ;
-    }
+    $guestPageUrl = $api->getGuestPageUrl($reservationId);
 
-    $api = new CareApi() ;
-    $api->setTokens($stripePayment->admin_id) ;
+    if ($stripePayment->status == 'done')
+        return redirect($guestPageUrl . "?payment=success");
 
-    $guestPageUrl = $api->getGuestPageUrl($reservationId) ;
+    if($request->input('action') == 'canceled')
+        return redirect($guestPageUrl . "?payment=canceled");
 
-    if($stripePayment->status == 'done'){
-        return redirect($guestPageUrl."?payment=success") ;
-    } ;
+    $tryAgainUrl = StripeApp::getTryAgainUrl($stripePayment);
 
-    if($request->input('action') == 'canceled'){
-        return redirect($guestPageUrl."?payment=canceled") ;
-    } ;
-
-    $tryAgainUrl = StripeApp::getTryAgainUrl($stripePayment) ;
-
-    view()->share('tryAgainUrl', $tryAgainUrl) ;
-    view()->share('guestPageUrl', $guestPageUrl) ;
-    view()->share('payment', $stripePayment) ;
-
-    return view('/payment') ;
-
-})  ;
+    return view('/payment', [
+        'tryAgainUrl' => $tryAgainUrl,
+        'guestPageUrl' => $guestPageUrl,
+        'payment' => $stripePayment
+    ]);
+});

@@ -2,6 +2,10 @@
 
 namespace App;
 
+use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Support\Facades\Validator;
+use Illuminate\Http\Request;
+
 class Helpers
 {
     public static function isJson($string) {
@@ -38,5 +42,20 @@ class Helpers
             return error_log(gettype($data) . ' -- ' . json_encode($data));
 
         return error_log(json_encode($data));
+    }
+
+    /**
+     * Handles request input validation on API routes.
+     * Throws HttpResponseException when validation fails.
+     */
+    public static function validation(Request $request, $rules) {
+        $validator = Validator::make($request->all(), $rules);
+
+        if ($validator->fails())
+            throw new HttpResponseException(response()->json([
+                'success' => false,
+                'message' => 'Validation errors',
+                'data' => $validator->errors()
+            ]));
     }
 }

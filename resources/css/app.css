@@ -2,15 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-
-body, html {
-    background-color: #ffffff;
-    min-height: 100px;
-    /* font-family: 'Poppins', sans-serif;
-    margin: 0px 0px 0px 0px;
-    overflow: hidden; */
+@layer components {
+    .btn {
+        @apply bg-stripe-500 text-white font-semibold hover:text-white py-2 px-4 border border-stripe-500 rounded;
+    }
+    .btn-secondary {
+        @apply bg-transparent hover:bg-stripe-500 text-stripe-700 font-semibold hover:text-white py-2 px-4 border border-stripe-500 hover:border-transparent rounded;
+    }
 }
 
-body  {
-    padding: 16px 16px;
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    background-color: #FFF;
+    font-family: 'Poppins', sans-serif;
 }

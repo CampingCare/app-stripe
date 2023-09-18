@@ -1,84 +1,62 @@
 <?php
 
 namespace App;
-use Session;
-use Exception;
-
-use App\Models\Logs;
-use App\Models\StripeTokens;
-use App\StripeOauth;
-use App\CareApi;
 
 class StripeApp
 {
-
-    static public function getTryAgainUrl($stripePayment)
+    public static function getTryAgainUrl($stripePayment)
     {
+        $stripePaymentData = json_decode($stripePayment->data);
 
-        $stripePaymentData = json_decode($stripePayment->data) ;
+        if (isset($stripePaymentData->line_items)) {
+            $amount = substr($stripePaymentData->line_items[0]->price_data->unit_amount, 0, -2) . '.' .
+                        substr($stripePaymentData->line_items[0]->price_data->unit_amount, -2);
 
-        $amount = substr($stripePaymentData->line_items[0]->price_data->unit_amount, 0, -2).".".substr($stripePaymentData->line_items[0]->price_data->unit_amount, -2) ;
-
-        $params = [] ; 
-        $params['admin_id'] = $stripePayment->admin_id ;
-        $params['amount'] = $amount ;
-        $params['currency'] = strtoupper($stripePaymentData->line_items[0]->price_data->currency) ;
-
-        if(isset($stripePaymentData->metadata->reservation_id)){
-            $params['reservation_id'] = $stripePaymentData->metadata->reservation_id ;
+            $currency = strtoupper($stripePaymentData->line_items[0]->price_data->currency);
+        } else {
+            $amount = $stripePaymentData->amount;
+            $currency = $stripePaymentData->currency;
         }
 
-        if(isset($stripePaymentData->metadata->reservation_number)){
-            $params['reservation_number'] = $stripePaymentData->metadata->reservation_number ;
-        }
+        $params = [];
+        $params['admin_id'] = $stripePayment->admin_id;
+        $params['amount'] = $amount;
+        $params['currency'] = $currency;
 
-        if(isset($stripePaymentData->metadata->invoice_id)){
-            $params['invoice_id'] = $stripePaymentData->metadata->invoice_id ;
-        }
+        if (isset($stripePaymentData->metadata->reservation_id))
+            $params['reservation_id'] = $stripePaymentData->metadata->reservation_id;
 
-        return '/api/webhooks/payment-request?'.http_build_query($params) ;
+        if (isset($stripePaymentData->metadata->reservation_number))
+            $params['reservation_number'] = $stripePaymentData->metadata->reservation_number;
 
+        if (isset($stripePaymentData->metadata->invoice_id))
+            $params['invoice_id'] = $stripePaymentData->metadata->invoice_id;
+
+        return '/api/webhooks/payment-request?' . http_build_query($params);
     }
 
-    static public function getMethodId($stripeMethodKey)
+    public static function getMethodId($stripeMethodKey)
     {
+        switch (strtolower($stripeMethodKey)) {
+            case 'bancontact':
+                return 15;
+            case 'card':
+                return 21;
+            case 'card_present':
+                return 4;
+            case 'eps':
+                return 11;
+            case 'giropay':
+                return 22;
+            case 'ideal':
+                return 8;
+            case 'klarna':
+                return 13;
+            case 'sofort':
+                return 13;
 
-        $stripeMethodKey = strtolower($stripeMethodKey);
-        
-        if($stripeMethodKey == 'bancontact'){
-            return 15 ;
+            default:
+                return 1;
         }
-
-        if($stripeMethodKey == 'card'){
-            return 21 ;
-        }
-
-        if($stripeMethodKey == 'card_present'){
-            return 4 ;
-        }
-
-        if($stripeMethodKey == 'eps'){
-            return 11 ;
-        }
-
-        if($stripeMethodKey == 'giropay'){
-            return 22 ;
-        }
-
-        if($stripeMethodKey == 'ideal'){
-            return 8 ;
-        }
-
-        if($stripeMethodKey == 'klarna'){
-            return 13 ;
-        }
-
-        if($stripeMethodKey == 'sofort'){
-            return 13 ;
-        }
-
-        return 1 ;
-        
     }
-
 }
