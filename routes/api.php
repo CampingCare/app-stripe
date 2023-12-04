@@ -144,7 +144,7 @@ Route::get('/webhooks/payment-request', function (Request $request) {
         $checkout_session = $stripe->checkout->sessions->create($requestData, ["stripe_account" => $stripeTokens->stripe_user_id]) ;
         
         $stripePayment->provider_id = $checkout_session->payment_intent ;
-        $stripePayment->data = json_encode($request) ;
+        $stripePayment->data = json_encode($requestData) ;
         $stripePayment->save() ;
         
         return redirect($checkout_session->url) ;
@@ -231,6 +231,18 @@ Route::post('/webhooks/payment', function (Request $request) {
             $paidDate = Carbon::createFromTimestamp($charge->created) ;
             $amount = substr($charge->amount, 0, -2).".".substr($charge->amount, -2) ;
 
+            $meta = [] ; 
+
+            $meta[] = [
+                'key' => 'stripe_payment_intent',
+                'value' => $stripePayment->provider_id
+            ] ;
+
+            $meta[] =  [
+                'key' => 'source',
+                'value' => $stripePayment->id
+            ] ;
+
             $requestData = [
                 'type' => 'invoice',
                 'type_id' => $stripePaymentData->metadata->invoice_id,
@@ -239,6 +251,7 @@ Route::post('/webhooks/payment', function (Request $request) {
                 'pay_date' => $paidDate->toDateTimeString(),
                 'provider' => 6,
                 'method' => StripeApp::getMethodId($charge->payment_method_details->type),
+                'meta' => $meta
             ] ;
 
             $response = $api->post('/payments', $requestData) ;
@@ -247,20 +260,6 @@ Route::post('/webhooks/payment', function (Request $request) {
 
                 $stripePayment->care_id = $response->json('id');
                 $stripePayment->save();
-
-                $requestDataMeta = [
-                    'key' => 'stripe_payment_intent',
-                    'value' => $stripePayment->provider_id
-                ] ;
-    
-                $api->put('/payments/'.$response->json('id').'/meta', $requestDataMeta) ;
-
-                $requestDataMeta = [
-                    'key' => 'source',
-                    'value' => $stripePaymentData->id
-                ] ;
-    
-                $api->put('/payments/'.$response->json('id').'/meta', $requestDataMeta) ;
 
                 $log = new Logs;
                 $log->description = 'Charge added via CareApi' ;

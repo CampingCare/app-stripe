@@ -142,6 +142,7 @@ Route::middleware(['care.app'])->group(function () {
 Route::get('/payment/{uuid}', function (Request $request, $uuid) {
 
     $stripePayment = StripePayment::where('uuid', $uuid)->first() ;
+
     $stripePaymentData = json_decode($stripePayment->data) ;
 
     $reservationId = false ; 
@@ -162,7 +163,7 @@ Route::get('/payment/{uuid}', function (Request $request, $uuid) {
     if($request->input('action') == 'canceled'){
         return redirect($guestPageUrl."?payment=canceled") ;
     } ;
-
+    
     $tryAgainUrl = StripeApp::getTryAgainUrl($stripePayment) ;
 
     view()->share('tryAgainUrl', $tryAgainUrl) ;
@@ -171,4 +172,4 @@ Route::get('/payment/{uuid}', function (Request $request, $uuid) {
 
     return view('/payment') ;
 
-})  ; 
+}) ; 
