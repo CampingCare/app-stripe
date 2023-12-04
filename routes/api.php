@@ -2,6 +2,8 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Session;
+use Illuminate\Support\Str;
 
 use App\Models\Logs;
 use App\Models\StripePayment;
@@ -10,7 +12,7 @@ use App\Models\StripeTokens;
 use App\StripeOauth;
 use App\StripeApp;
 use App\CareApi;
-
+use App\Helpers;
 use Carbon\Carbon;
 
 /*
@@ -24,77 +26,77 @@ use Carbon\Carbon;
 |
 */
 
-Route::get('/webhooks/payment-request', function (Request $request) {
+Route::post('/webhooks/payment-request', function (Request $request) {
+    Helpers::validation($request, [
+        'admin_id' => 'required',
+        'amount' => 'required',
+        'currency' => 'required'
+    ]);
 
-    $uuid = Str::uuid() ;
-    $admin_id = $request->input('admin_id') ;
+    $uuid = Str::uuid();
+    $adminId = $request->input('admin_id');
     $amount = number_format($request->input('amount'), 2, '', '');
-    $currency = strtoupper($request->input('currency')) ;
+    $currency = strtoupper($request->input('currency'));
 
+    // Add payment to database
     $stripePayment = new StripePayment;
 
-    $stripePayment->uuid = $uuid ;
-    $stripePayment->admin_id = $admin_id ;
-    $stripePayment->status = 'pending' ;
-    $stripePayment->amount = $request->input('amount') ;
+    $stripePayment->uuid = $uuid;
+    $stripePayment->admin_id = $adminId;
+    $stripePayment->status = 'pending';
+    $stripePayment->amount = $request->input('amount');
 
-    $stripePayment->save() ;
+    $stripePayment->save();
 
-    Session::put('adminId', $admin_id) ;
-    $stripeTokens = StripeTokens::find($admin_id) ;
+    Session::put('adminId', $adminId);
+    $stripeTokens = StripeTokens::find($adminId);
 
-    $metadata = [] ; 
-    $description = __('Payment')." ".$stripePayment->id ;
+    $description = __('Payment') . ' ' . $stripePayment->id;
+    $metadata = [
+        'uuid' => $uuid,
+        'admin_id' => $adminId
+    ];
 
-    $metadata['uuid'] = $uuid ;
+    if ($request->input('reservation_id'))
+        $metadata['reservation_id'] = $request->input('reservation_id');
 
-    if($request->input('admin_id')){
-        $metadata['admin_id'] = $admin_id ;
+    if ($request->input('reservation_number')) {
+        $metadata['reservation_number'] = $request->input('reservation_number');
+        $description = __('Reservation') . ' ' . $request->input('reservation_number');
     }
 
-    if($request->input('reservation_id')){
-        $metadata['reservation_id'] = $request->input('reservation_id') ;
-    }
-
-    if($request->input('reservation_number')){
-        $metadata['reservation_number'] = $request->input('reservation_number') ;
-        $description = __('Reservation')." ".$request->input('reservation_number') ;
-    }
-
-    if($request->input('invoice_id')){
-        $metadata['invoice_id'] = $request->input('invoice_id') ;
-    }  
+    if ($request->input('invoice_id'))
+        $metadata['invoice_id'] = $request->input('invoice_id');
 
     $stripe = StripeOauth::getStripe();
 
-    if($request->input('device_id')){
-        
-        $metadata['device_id'] = $request->input('device_id') ;
+    if ($request->input('device_id'))
+    {
+        $metadata['device_id'] = $request->input('device_id');
 
-        $api = new CareApi() ;
-        $api->setTokens($metadata['admin_id']) ;
+        $api = new CareApi();
+        $api->setTokens($metadata['admin_id']);
 
-        $response = $api->get('/devices/'.$metadata['device_id']) ;
+        $response = $api->get("/devices/{$metadata['device_id']}");
 
-        $device = $response->json() ;
+        $device = $response->json();
 
-        if(!isset($device['meta']['stripe_terminal_id'])){
-            dd('Could not find the Stripe Terminal ID');
-        }
+        if (!isset($device['meta']['stripe_terminal_id']))
+            Helpers::log('Could not find the Stripe Terminal ID');
 
+        // Add payment to Stripe
         $requestData = [
             'currency' => strtolower($currency),
             'payment_method_types' => ['card_present'],
             'capture_method' => 'automatic',
             'amount' => $amount,
-            'metadata' => $metadata,
-        ] ;
+            'metadata' => $metadata
+        ];
 
-        if($request->input('application_fee')){
-            $requestData['application_fee_amount'] = number_format($request->input('application_fee'), 2, '', '') ;
-        }
+        if ($request->input('application_fee'))
+            $requestData['application_fee_amount'] = number_format($request->input('application_fee'), 2, '', '');
 
-        $paymentIntent = $stripe->paymentIntents->create($requestData, ["stripe_account" => $stripeTokens->stripe_user_id]) ;
+        $paymentIntent = $stripe->paymentIntents->create($requestData, ["stripe_account" => $stripeTokens->stripe_user_id]);
 
         $stripe->terminal->readers->processPaymentIntent(
             $device['meta']['stripe_terminal_id'],
@@ -102,18 +104,17 @@ Route::get('/webhooks/payment-request', function (Request $request) {
             ["stripe_account" => $stripeTokens->stripe_user_id]
         );
 
-        $stripePayment->provider_id = $paymentIntent->id ;
-        $stripePayment->data = json_encode($request) ;
-        $stripePayment->save() ;
-        
-        return response()->json('ok') ;
+        $stripePayment->provider_id = $paymentIntent->id;
+        $stripePayment->data = json_encode($request);
+        $stripePayment->save();
 
-    } else {
+        return response()->json('ok');
+    }
+    else {
+        // Add payment to Stripe
+        $metadata['invoice_id'] = $request->input('invoice_id');
 
-        $metadata['invoice_id'] = $request->input('invoice_id') ;
-
-        $requestData = 
-        [
+        $requestData = [
             'line_items' => [[
                 'price_data' => [
                     'currency' => strtolower($currency),
@@ -125,33 +126,32 @@ Route::get('/webhooks/payment-request', function (Request $request) {
                 'quantity' => 1,
             ]],
             'mode' => 'payment',
-            'success_url' => getenv('APP_URL')."/payment/".$uuid,
-            'cancel_url' => getenv('APP_URL')."/payment/".$uuid."?action=canceled",
+            'success_url' => getenv('APP_URL') . "/payment/" . $uuid,
+            'cancel_url' => getenv('APP_URL') . "/payment/" . $uuid . "?action=canceled",
             'automatic_tax' => [
                 'enabled' => false,
             ],
-            'metadata' => $metadata,
-        ] ;
+            'metadata' => $metadata
+        ];
 
-        if($request->input('application_fee')){
-
+        if ($request->input('application_fee'))
             $requestData['payment_intent_data'] = [
                 "application_fee_amount" => number_format($request->input('application_fee'), 2, '', '')
-            ] ;
+            ];
 
-        }
+        $checkout_session = $stripe->checkout->sessions->create($requestData, ["stripe_account" => $stripeTokens->stripe_user_id]);
 
-        $checkout_session = $stripe->checkout->sessions->create($requestData, ["stripe_account" => $stripeTokens->stripe_user_id]) ;
-        
-        $stripePayment->provider_id = $checkout_session->payment_intent ;
-        $stripePayment->data = json_encode($requestData) ;
-        $stripePayment->save() ;
-        
-        return redirect($checkout_session->url) ;
+        $stripePayment->provider_id = $checkout_session->payment_intent;
+        $stripePayment->data = json_encode($request->all());
+        $stripePayment->save();
 
+        // return redirect($checkout_session->url);
+        return response()->json([
+            'success' => true,
+            'data' => $requestData
+        ]);
     }
-
-}) ; 
+});
 
 Route::post('/webhooks/payment', function (Request $request) {
 
@@ -213,7 +213,7 @@ Route::post('/webhooks/payment', function (Request $request) {
     if(isset($stripePaymentData->metadata->invoice_id)){
 
         try {
-            
+
             if(intval($stripePayment->care_id) > 0){
 
                 $log = new Logs;
@@ -231,18 +231,6 @@ Route::post('/webhooks/payment', function (Request $request) {
             $paidDate = Carbon::createFromTimestamp($charge->created) ;
             $amount = substr($charge->amount, 0, -2).".".substr($charge->amount, -2) ;
 
-            $meta = [] ; 
-
-            $meta[] = [
-                'key' => 'stripe_payment_intent',
-                'value' => $stripePayment->provider_id
-            ] ;
-
-            $meta[] =  [
-                'key' => 'source',
-                'value' => $stripePayment->id
-            ] ;
-
             $requestData = [
                 'type' => 'invoice',
                 'type_id' => $stripePaymentData->metadata->invoice_id,
@@ -251,7 +239,6 @@ Route::post('/webhooks/payment', function (Request $request) {
                 'pay_date' => $paidDate->toDateTimeString(),
                 'provider' => 6,
                 'method' => StripeApp::getMethodId($charge->payment_method_details->type),
-                'meta' => $meta
             ] ;
 
             $response = $api->post('/payments', $requestData) ;
@@ -261,16 +248,30 @@ Route::post('/webhooks/payment', function (Request $request) {
                 $stripePayment->care_id = $response->json('id');
                 $stripePayment->save();
 
+                $requestDataMeta = [
+                    'key' => 'stripe_payment_intent',
+                    'value' => $stripePayment->provider_id
+                ] ;
+
+                $api->put('/payments/'.$response->json('id').'/meta', $requestDataMeta) ;
+
+                $requestDataMeta = [
+                    'key' => 'source',
+                    'value' => $stripePaymentData->id
+                ] ;
+
+                $api->put('/payments/'.$response->json('id').'/meta', $requestDataMeta) ;
+
                 $log = new Logs;
                 $log->description = 'Charge added via CareApi' ;
                 $log->admin_id = $stripePayment->admin_id ;
                 $log->response = json_encode($charge) ;
                 $log->save() ;
-                
+
             }
 
         } catch (Exception $e) {
-            
+
             $log = new Logs;
             $log->description = 'CareApiError ' . $e->getMessage();
             $log->admin_id = $stripePayment->admin_id ;
@@ -279,7 +280,7 @@ Route::post('/webhooks/payment', function (Request $request) {
             http_response_code(400);
 
             return response()->json('error') ;
-            
+
         }
 
         $stripePayment->status = 'done' ;
@@ -289,4 +290,4 @@ Route::post('/webhooks/payment', function (Request $request) {
 
     return response()->json('ok') ;
 
-})  ; 
+})  ;

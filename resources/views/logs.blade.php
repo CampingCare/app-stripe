@@ -1,52 +1,53 @@
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
+<x-layout>
+    <div class="flex max-h-screen overflow-y-auto">
+        <aside class="w-2/6 h-screen border-r-2 sticky top-0 left-0">
+            <nav class="p-4">
+                <div class="mb-4 flex items-center justify-between">
+                    <a href="/" class="btn-secondary mr-2"><</a>
 
-    <head>
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+                    <h2 class="text-xl">{{ __('Stripe Logs') }}</h2>
 
-        <title>Stripe App</title>
-
-        @vite('resources/css/app.css')
-
-
-    </head>
-
-    <body>
-
-        <div>
-
-            <h1 class="text-3xl font-bold">{{ __('Logs') }}</h1>
-
-            <p class="py-4 mt-4">{{ __('Last logs (Maximal 100)') }}</p>
-
-            <div class="py-4">
-                <a href="/" class="bg-transparent hover:bg-blue-500 text-blue-700 font-semibold hover:text-white py-2 px-4 border border-blue-500 hover:border-transparent rounded">{{ __('Back') }}</a>
-            </div>
-
-            @if (count($logs) == 0) 
-
-                <div class="py-4 mt-4">
-                    {{ __('No logs have been found') }}
+                    <a href="/logs?action=clear" class="btn-secondary text-xs px-2">{{ __('Clear') }}</a>
                 </div>
 
-            @endif
+                <ul class="overflow-y-auto max-h-screen pb-4">
+                    <li class="mb-4 cursor-pointer">
+                        <button class="block btn-secondary text-xs w-full" onclick="location.reload()">{{ __('Reload') }}</button>
+                    </li>
 
+                    @foreach ($logs as $log)
+                        <li class="mb-4 cursor-pointer">
+                            <a href="#{{ $log['id'] }}" class="block btn-secondary">{{ $log['id'] }} - {{ $log['description'] }}</a>
+                        </li>
+                    @endforeach
+
+                    @if (count($logs) <= 0)
+                        <li class="mb-4 cursor-pointer">
+                            <a class="block btn-secondary">{{ __('No logs') }}</a>
+                        </li>
+                    @endif
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="w-4/6 ml-8 m-4">
             @foreach ($logs as $log)
-                <pre><?php print_r(json_decode(json_encode($log))) ?></pre>
+                <section id="{{ $log['id'] }}" class="mb-8">
+                    <h2 class="text-xl font-semibold mb-2">{{ $log['id'] }} - {{ $log['description'] }}</h2>
+                    <div class="bg-gray-100 p-4 rounded-lg shadow-md">
+                        <h3 class="font-semibold mb-2">{{ __('ID') }}: <span class="font-normal">{{ $log['id'] }}</span></h3>
+                        <h3 class="font-semibold mb-2">{{ __('Description') }}: <span class="font-normal">{{ $log['description'] }}</span></h3>
+                        <h3 class="font-semibold mb-2">{{ __('Created at') }}: <span class="font-normal">{{ $log['created_at'] }}</span></h3>
+                        <h3 class="font-semibold mb-2">{{ __('Updated at') }}: <span class="font-normal">{{ $log['updated_at'] }}</span></h3>
+
+                        <h3 class="font-semibold mb-2">{{ __('Request:') }}</span></h3>
+                        <pre><code class="text-sm">{{ json_encode(json_decode($log['request']), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</code></pre>
+
+                        <h3 class="font-semibold mb-2">{{ __('Response:') }}</span></h3>
+                        <pre><code class="text-sm">{{ json_encode(json_decode($log['response']), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES) }}</code></pre>
+                    </div>
+                </section>
             @endforeach
-            
-            @if (count($logs) > 0) 
-
-                <a href="/logs?action=clear">Clear logs</a> 
-
-            @endif
-            
-            
-            <script src="{{ asset('js/widgets.js')}}"></script>
-
-        </div>
-
-    </body>
-
-</html>
+        </main>
+    </div>
+</x-layout>
