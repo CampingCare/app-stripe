@@ -27,13 +27,15 @@ use Carbon\Carbon;
 */
 
 Route::post('/webhooks/payment-request', function (Request $request) {
+
     Helpers::validation($request, [
         'admin_id' => 'required',
         'amount' => 'required',
         'currency' => 'required'
     ]);
 
-    $uuid = Str::uuid();
+    $uuid = "pay_".str_replace("-", "", Str::uuid());
+
     $adminId = $request->input('admin_id');
     $amount = number_format($request->input('amount'), 2, '', '');
     $currency = strtoupper($request->input('currency'));
@@ -232,6 +234,7 @@ Route::post('/webhooks/payment', function (Request $request) {
             $amount = substr($charge->amount, 0, -2).".".substr($charge->amount, -2) ;
 
             $requestData = [
+                'payment_uid' => $stripePayment->uuid,
                 'type' => 'invoice',
                 'type_id' => $stripePaymentData->metadata->invoice_id,
                 'amount' => $amount,
