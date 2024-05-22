@@ -27,8 +27,20 @@ use App\StripeTerminals;
 Route::middleware(['care.app'])->group(function () {
 
     Route::get('/', function (Request $request) {
+
         if (!Session::get('installed'))
             return view('welcome');
+
+        if ($request->input('code')){
+
+            if (!$request->has('state'))
+                return redirect('https://app.camping.care');
+
+            StripeOauth::setAccessToken($request->input('code'), $state['admin_id']);
+            
+            return redirect("{$state['platformUrl']}/apps/{$state['app_id']}");
+
+        }
 
         if ($request->input('action') == 'disconnect')
             StripeOauth::removeAccessToken();
@@ -45,19 +57,19 @@ Route::middleware(['care.app'])->group(function () {
                 'app_id' => Session::get('appId')
             ])
         ]);
+
     });
 
-    Route::get('/connect', function (Request $request) {
-        if (!$request->has('state'))
-            return redirect('https://app.camping.care');
+    // Route::get('/connect', function (Request $request) {
+        
 
-        $state = json_decode($request->input('state'), true);
+    //     $state = json_decode($request->input('state'), true);
 
-        if ($request->input('code'))
-            StripeOauth::setAccessToken($request->input('code'), $state['admin_id']);
+    //     if ($request->input('code'))
+    //         StripeOauth::setAccessToken($request->input('code'), $state['admin_id']);
 
-        return redirect("{$state['platformUrl']}/apps/{$state['app_id']}");
-    });
+    //     return redirect("{$state['platformUrl']}/apps/{$state['app_id']}");
+    // });
 
     Route::get('/logs', function (Request $request) {
         $logs = 'no logs';
